@@ -7,11 +7,17 @@ import {
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────
-type Category   = "diagnosis" | "cognitive" | "medication" | "function" | "history" | "acute" | "radiology" | "lab";
 type ADRDOption = "Yes" | "No" | "Uncertain";
 type SubtypeOpt = "AD" | "VaD" | "FTD" | "LBD" | "Mixed" | "Unspecified";
 type Strength   = "STRONG" | "MODERATE" | "WEAK" | null;
 type EvStatus   = "accepted" | "rejected" | null;
+
+interface SectionDef {
+  value: string;
+  label: string;
+  dotColor: string;
+  highlightStyle: React.CSSProperties;
+}
 
 interface ManualLabel {
   id: number;
@@ -36,7 +42,7 @@ interface EvidenceItem {
   desc: string;
   quote: string;
   spanId: string;
-  cat: Category;
+  cat: string;
 }
 
 interface TimelineItem {
@@ -47,66 +53,44 @@ interface TimelineItem {
   order?: number;
 }
 
-// ─── Highlight colours ────────────────────────────────────────
-// Use inline-style hex values so the colours are NEVER purged by Tailwind.
-const CAT_STYLE: Record<Category, React.CSSProperties> = {
-  diagnosis:  { backgroundColor: "#bfdbfe", color: "#1e3a8a", borderBottom: "2px solid #3b82f6" },
-  history:    { backgroundColor: "#bfdbfe", color: "#1e3a8a", borderBottom: "2px solid #3b82f6" },
-  function:   { backgroundColor: "#bfdbfe", color: "#1e3a8a", borderBottom: "2px solid #3b82f6" },
-  medication: { backgroundColor: "#e9d5ff", color: "#581c87", borderBottom: "2px solid #a855f7" },
-  cognitive:  { backgroundColor: "#fecdd3", color: "#881337", borderBottom: "2px solid #f43f5e" },
-  acute:      { backgroundColor: "#a7f3d0", color: "#065f46", borderBottom: "2px solid #10b981" },
-  radiology:  { backgroundColor: "#fed7aa", color: "#7c2d12", borderBottom: "2px solid #f97316" },
-  lab:        { backgroundColor: "#a7f3d0", color: "#065f46", borderBottom: "2px solid #10b981" },
-};
-
-// Keep CAT_CLS as string fallback (not relied on for visible highlights)
-const CAT_CLS: Record<Category, string> = {
-  diagnosis:  "bg-blue-200 text-blue-900 border-b-2 border-blue-400",
-  history:    "bg-blue-200 text-blue-900 border-b-2 border-blue-400",
-  function:   "bg-blue-200 text-blue-900 border-b-2 border-blue-400",
-  medication: "bg-purple-200 text-purple-900 border-b-2 border-purple-400",
-  cognitive:  "bg-rose-200 text-rose-900 border-b-2 border-rose-400",
-  acute:      "bg-emerald-200 text-emerald-900 border-b-2 border-emerald-400",
-  radiology:  "bg-orange-200 text-orange-900 border-b-2 border-orange-400",
-  lab:        "bg-emerald-200 text-emerald-900 border-b-2 border-emerald-400",
-};
-
-// Keep CAT for any legacy usage (evidence dot colors, etc.)
-const CAT: Record<Category, { bg: string; text: string }> = {
-  diagnosis:  { bg: "bg-blue-100",    text: "text-blue-900"    },
-  history:    { bg: "bg-blue-100",    text: "text-blue-900"    },
-  function:   { bg: "bg-blue-100",    text: "text-blue-900"    },
-  medication: { bg: "bg-purple-100",  text: "text-purple-900"  },
-  cognitive:  { bg: "bg-rose-100",    text: "text-rose-900"    },
-  acute:      { bg: "bg-emerald-100", text: "text-emerald-900" },
-  radiology:  { bg: "bg-orange-100",  text: "text-orange-900"  },
-  lab:        { bg: "bg-emerald-100", text: "text-emerald-900" },
-};
+// ─── Section definitions ──────────────────────────────────────
+const BASE_SECTIONS: SectionDef[] = [
+  {
+    value: "history",
+    label: "History",
+    dotColor: "#3b82f6",
+    highlightStyle: { backgroundColor: "#bfdbfe", color: "#1e3a8a", borderBottom: "2px solid #3b82f6" },
+  },
+  {
+    value: "lab",
+    label: "Lab",
+    dotColor: "#10b981",
+    highlightStyle: { backgroundColor: "#a7f3d0", color: "#065f46", borderBottom: "2px solid #10b981" },
+  },
+  {
+    value: "medication",
+    label: "Medications",
+    dotColor: "#a855f7",
+    highlightStyle: { backgroundColor: "#e9d5ff", color: "#581c87", borderBottom: "2px solid #a855f7" },
+  },
+  {
+    value: "radiology",
+    label: "Radiology",
+    dotColor: "#f97316",
+    highlightStyle: { backgroundColor: "#fed7aa", color: "#7c2d12", borderBottom: "2px solid #f97316" },
+  },
+  {
+    value: "cognitive",
+    label: "Cognitive Tests",
+    dotColor: "#f43f5e",
+    highlightStyle: { backgroundColor: "#fecdd3", color: "#881337", borderBottom: "2px solid #f43f5e" },
+  },
+];
 
 const STRENGTH_CLS: Record<string, string> = {
   STRONG:   "text-green-600",
   MODERATE: "text-amber-600",
   WEAK:     "text-red-500",
-};
-
-// ─── Left section navigator ───────────────────────────────────
-const LEFT_NAV = [
-  { key: "all",       label: "All",            dot: "bg-gray-400"    },
-  { key: "history",   label: "History",        dot: "bg-blue-500"    },
-  { key: "lab",       label: "Lab",            dot: "bg-emerald-500" },
-  { key: "meds",      label: "Medications",    dot: "bg-purple-500"  },
-  { key: "radiology", label: "Radiology",      dot: "bg-orange-500"  },
-  { key: "cognitive", label: "Cognitive Tests",dot: "bg-rose-500"    },
-];
-
-// Maps left-nav key → evidence cat value  ("all" is handled separately)
-const NAV_TO_CAT: Record<string, string> = {
-  history:   "history",
-  lab:       "lab",
-  meds:      "medication",
-  radiology: "radiology",
-  cognitive: "cognitive",
 };
 
 // ─── Note section tab bar ─────────────────────────────────────
@@ -122,17 +106,32 @@ const NOTE_SECTIONS = [
   { key: "medssec", label: "Medications"                },
 ];
 
-// ─── Label category palette ───────────────────────────────────
-const LABEL_CATS = [
-  { value: "history",   label: "History",         dot: "bg-blue-500",    pill: "bg-blue-100 text-blue-800 border-blue-200",       hover: "hover:bg-blue-50 hover:border-blue-400"    },
-  { value: "lab",       label: "Lab",             dot: "bg-emerald-500", pill: "bg-emerald-100 text-emerald-800 border-emerald-200", hover: "hover:bg-emerald-50 hover:border-emerald-400" },
-  { value: "medication",label: "Medications",     dot: "bg-purple-500",  pill: "bg-purple-100 text-purple-800 border-purple-200",  hover: "hover:bg-purple-50 hover:border-purple-400"  },
-  { value: "radiology", label: "Radiology",       dot: "bg-orange-500",  pill: "bg-orange-100 text-orange-800 border-orange-200",  hover: "hover:bg-orange-50 hover:border-orange-400"  },
-  { value: "cognitive", label: "Cognitive Tests", dot: "bg-rose-500",    pill: "bg-rose-100 text-rose-800 border-rose-200",        hover: "hover:bg-rose-50 hover:border-rose-400"      },
-];
-
 // ─── Patient row mapper ───────────────────────────────────────
 function nk(s: string) { return s.toLowerCase().replace(/[_\s\-]/g, ""); }
+
+function hexToRgba(hex: string, alpha: number) {
+  const raw = hex.replace("#", "").trim();
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  if (full.length !== 6) return `rgba(59,130,246,${alpha})`;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function sectionFromColor(value: string, label: string, color: string): SectionDef {
+  const safeColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#3b82f6";
+  return {
+    value,
+    label,
+    dotColor: safeColor,
+    highlightStyle: {
+      backgroundColor: hexToRgba(safeColor, 0.22),
+      color: "#111827",
+      borderBottom: `2px solid ${safeColor}`,
+    },
+  };
+}
 
 function getRowValue(row: Record<string, string>, candidates: string[]) {
   const norms = candidates.map(nk);
@@ -149,7 +148,7 @@ function parseJSON(value: string): unknown | null {
   }
 }
 
-function normalizeCategory(value: string): Category {
+function normalizeCategory(value: string): string {
   const v = nk(value);
   if (v.includes("med")) return "medication";
   if (v.includes("radio") || v.includes("image") || v.includes("ct") || v.includes("mri")) return "radiology";
@@ -158,7 +157,7 @@ function normalizeCategory(value: string): Category {
   if (v.includes("diag")) return "diagnosis";
   if (v.includes("acute") || v.includes("delir")) return "acute";
   if (v.includes("func") || v.includes("adl")) return "function";
-  return "history";
+  return v || "history";
 }
 
 function normalizeStrength(value: string): Strength {
@@ -384,17 +383,20 @@ export default function ADRDReview() {
   const [activeLeftNav, setActiveLeftNav]             = useState("all");
   const [activeNoteSection, setActiveNoteSection]     = useState("cc");
   const [activeSpan, setActiveSpan]                   = useState<string | null>(null);
-  const [activeEv, setActiveEv]                       = useState<number | null>(null);
+  const [activeEv, setActiveEv]                       = useState<string | null>(null);
   const [adrd, setAdrd]                               = useState<ADRDOption>("Uncertain");
   const [subtype, setSubtype]                         = useState<SubtypeOpt>("Unspecified");
-  const [evidenceStatus, setEvidenceStatus]           = useState<Record<number, EvStatus>>({});
+  const [evidenceStatus, setEvidenceStatus]           = useState<Record<string, EvStatus>>({});
   const [demoOpen, setDemoOpen]                       = useState(true);
   const [timelineTab, setTimelineTab]                 = useState<"admission" | "comprehensive">("admission");
   const [manualLabels, setManualLabels]               = useState<ManualLabel[]>([]);
+  const [customSections, setCustomSections]           = useState<SectionDef[]>([]);
   const [selectionPopover, setSelectionPopover]       = useState<SelectionPopover | null>(null);
   const [customFormOpen, setCustomFormOpen]           = useState(false);
   const [customText, setCustomText]                   = useState("");
   const [customCategory, setCustomCategory]           = useState("history");
+  const [newSectionName, setNewSectionName]           = useState("");
+  const [newSectionColor, setNewSectionColor]         = useState("#0ea5e9");
 
   const middleRef  = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -408,6 +410,40 @@ export default function ADRDReview() {
     confidence: null as number | null,
   };
   const evidenceItems = currentPatientRaw ? mapEvidenceFromRow(currentPatientRaw) : [];
+  const sectionDefs = [...BASE_SECTIONS, ...customSections];
+  const sectionMap = new Map(sectionDefs.map((s) => [s.value, s]));
+  const leftNavItems = [
+    { key: "all", label: "All", dotColor: "#9ca3af" },
+    ...sectionDefs.map((s) => ({ key: s.value, label: s.label, dotColor: s.dotColor })),
+  ];
+
+  const getSectionDef = (category: string) => {
+    if (sectionMap.has(category)) return sectionMap.get(category) as SectionDef;
+    const key = normalizeCategory(category);
+    return sectionMap.get(key) ?? sectionMap.get("history") ?? BASE_SECTIONS[0];
+  };
+
+  const displayEvidence = [
+    ...evidenceItems.map((ev) => ({
+      key: `ai-${ev.id}`,
+      source: "ai" as const,
+      type: ev.type,
+      strength: ev.strength,
+      desc: ev.desc,
+      spanId: ev.spanId,
+      cat: ev.cat,
+    })),
+    ...manualLabels.map((lbl) => ({
+      key: `manual-${lbl.id}`,
+      source: "manual" as const,
+      type: getSectionDef(lbl.category).label,
+      strength: null as Strength,
+      desc: `"${lbl.text}"`,
+      spanId: `ml-span-${lbl.id}`,
+      cat: lbl.category,
+    })),
+  ];
+
   const admissionTimeline = currentPatientRaw
     ? mapTimelineFromRow(currentPatientRaw, ["admission_timeline", "timeline_admission", "timeline_this_admission"])
     : [];
@@ -538,6 +574,24 @@ export default function ADRDReview() {
     window.getSelection()?.removeAllRanges();
   };
 
+  const addCustomSection = () => {
+    const label = newSectionName.trim();
+    if (!label) return;
+
+    const base = `custom_${nk(label) || "section"}`;
+    let value = base;
+    let i = 2;
+    while (sectionMap.has(value) || value === "all") {
+      value = `${base}_${i}`;
+      i += 1;
+    }
+
+    const section = sectionFromColor(value, label, newSectionColor);
+    setCustomSections((prev) => [...prev, section]);
+    setCustomCategory(section.value);
+    setNewSectionName("");
+  };
+
   // ── Add custom label (fallback form) ─────────────────────────
   const addCustomLabel = () => {
     if (!customText.trim()) return;
@@ -561,8 +615,8 @@ export default function ADRDReview() {
 
   const scrollToLeftNav = useCallback((key: string) => {
     setActiveLeftNav(key);
-    const cat = NAV_TO_CAT[key];
-    if (!cat || !middleRef.current) return;
+    const cat = key;
+    if (cat === "all" || !middleRef.current) return;
 
     // Wait for re-render after filter switch, then jump to first visible highlight of this category.
     setTimeout(() => {
@@ -570,7 +624,7 @@ export default function ADRDReview() {
       if (!container) return;
 
       const byCategory = container.querySelector(`[data-ev-cat="${cat}"]`) as HTMLElement | null;
-      const fallbackEvidence = evidenceItems.find((ev) => ev.cat === cat);
+      const fallbackEvidence = displayEvidence.find((ev) => ev.cat === cat);
       const byId = fallbackEvidence
         ? (document.getElementById(fallbackEvidence.spanId) as HTMLElement | null)
         : null;
@@ -583,21 +637,20 @@ export default function ADRDReview() {
         });
       }
     }, 80);
-  }, [evidenceItems]);
+  }, [displayEvidence]);
 
-  const jumpToSpan = (spanId: string, evId: number) => {
+  const jumpToSpan = (spanId: string, evId: string) => {
     setActiveSpan(spanId);
     setActiveEv(evId);
     // Switch left-nav so the correct category highlight becomes visible
-    const ev = evidenceItems.find((e) => e.id === evId);
+    const ev = displayEvidence.find((e) => e.key === evId);
     if (ev) {
-      const navKey = Object.entries(NAV_TO_CAT).find(([, cat]) => cat === ev.cat)?.[0];
-      if (navKey) setActiveLeftNav(navKey);
+      setActiveLeftNav(ev.cat);
     }
     setTimeout(() => document.getElementById(spanId)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   };
 
-  const onSpanClick = (spanId: string, evId?: number) => {
+  const onSpanClick = (spanId: string, evId?: string) => {
     setActiveSpan(spanId);
     if (evId) {
       setActiveEv(evId);
@@ -605,7 +658,7 @@ export default function ADRDReview() {
     }
   };
 
-  const toggleEvStatus = (id: number, status: "accepted" | "rejected") =>
+  const toggleEvStatus = (id: string, status: "accepted" | "rejected") =>
     setEvidenceStatus((prev) => ({ ...prev, [id]: prev[id] === status ? null : status }));
 
   // ── Export JSON ───────────────────────────────────────────────
@@ -614,9 +667,13 @@ export default function ADRDReview() {
       exportTimestamp: new Date().toISOString(),
       patient: activeDemographics,
       adrdDiagnosis: { adrd, subtype, confidence: diagnosisDefaults.confidence },
-      evidence: evidenceItems.map((ev) => ({
-        id: ev.id, type: ev.type, strength: ev.strength,
-        description: ev.desc, status: evidenceStatus[ev.id] ?? "pending",
+      evidence: displayEvidence.map((ev) => ({
+        id: ev.key,
+        source: ev.source,
+        type: ev.type,
+        strength: ev.strength,
+        description: ev.desc,
+        status: evidenceStatus[ev.key] ?? "pending",
       })),
       manualLabels,
     };
@@ -629,13 +686,14 @@ export default function ADRDReview() {
     document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
-  const labelCatMeta = (val: string) => LABEL_CATS.find((c) => c.value === val) ?? LABEL_CATS[0];
+  const labelCatMeta = (val: string) => getSectionDef(val);
 
   // ── hl(): plain render-helper (NOT a React component) ────────
   // Using a plain function avoids the "new component type per render" issue:
   // React sees the returned <span> directly, never unmounts/remounts it.
-  const hl = (id: string, cat: Category, text: string, evId?: number): React.ReactNode => {
-    const activeCat = NAV_TO_CAT[activeLeftNav];
+  const hl = (id: string, cat: string, text: string, evId?: string): React.ReactNode => {
+    const activeCat = activeLeftNav;
+    const section = getSectionDef(cat);
     const isVisible = activeLeftNav === "all" || cat === activeCat;
     if (!isVisible) return <span key={id} id={id}>{text}</span>;
     return (
@@ -653,7 +711,7 @@ export default function ADRDReview() {
           }
         }}
         style={{
-          ...CAT_STYLE[cat],
+          ...section.highlightStyle,
           paddingLeft: "2px",
           paddingRight: "2px",
           borderRadius: "2px",
@@ -670,23 +728,24 @@ export default function ADRDReview() {
 
   // ── Highlight evidence quotes inside any plain text ───────────
   const renderHighlightedNote = (text: string): React.ReactNode => {
-    const activeCat = NAV_TO_CAT[activeLeftNav];
+    const activeCat = activeLeftNav;
 
-    const candidates: { spanId: string; quote: string; cat: Category; evId?: number }[] = [
+    const candidates: { spanId: string; quote: string; cat: string; evId?: string }[] = [
       ...evidenceItems.map((ev) => ({
         spanId: ev.spanId,
         quote: ev.quote,
         cat: ev.cat,
-        evId: ev.id,
+        evId: `ai-${ev.id}`,
       })),
       ...manualLabels.map((lbl) => ({
         spanId: `ml-span-${lbl.id}`,
         quote: lbl.text,
-        cat: normalizeCategory(lbl.category),
+        cat: lbl.category,
+        evId: `manual-${lbl.id}`,
       })),
     ].filter((c) => activeLeftNav === "all" || c.cat === activeCat);
 
-    const matches: { start: number; end: number; item: { spanId: string; quote: string; cat: Category; evId?: number } }[] = [];
+    const matches: { start: number; end: number; item: { spanId: string; quote: string; cat: string; evId?: string } }[] = [];
 
     const normalizeWithMap = (input: string) => {
       const chars: string[] = [];
@@ -952,13 +1011,13 @@ export default function ADRDReview() {
             <p className="text-xs font-semibold text-gray-700">Section Navigator</p>
           </div>
           <nav className="flex-1 overflow-y-auto">
-            {LEFT_NAV.map((sec) => {
+            {leftNavItems.map((sec) => {
               const active = activeLeftNav === sec.key;
               return (
                 <button key={sec.key} onClick={() => scrollToLeftNav(sec.key)}
                   className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition-colors
                     ${active ? "bg-gray-100" : "hover:bg-gray-50"}`}>
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${sec.dot}`} />
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sec.dotColor }} />
                   <span className={`flex-1 ${active ? "font-medium text-gray-900" : "text-gray-600"}`}>
                     {sec.label}
                   </span>
@@ -967,6 +1026,35 @@ export default function ADRDReview() {
               );
             })}
           </nav>
+
+          {/* Create custom section */}
+          <div className="border-t border-gray-100 px-3 py-2.5 space-y-1.5">
+            <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Add Section</p>
+            <input
+              type="text"
+              placeholder="Section name"
+              value={newSectionName}
+              onChange={(e) => setNewSectionName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addCustomSection()}
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-400 bg-white"
+            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="color"
+                value={newSectionColor}
+                onChange={(e) => setNewSectionColor(e.target.value)}
+                className="w-8 h-8 border border-gray-300 rounded p-0.5 bg-white shrink-0"
+                title="Section color"
+              />
+              <button
+                onClick={addCustomSection}
+                disabled={!newSectionName.trim()}
+                className="flex-1 text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded hover:bg-gray-700 disabled:opacity-40 transition-colors"
+              >
+                Add
+              </button>
+            </div>
+          </div>
         </aside>
 
         {/* ── MIDDLE: Clinical Note ── */}
@@ -1147,33 +1235,35 @@ export default function ADRDReview() {
             {/* 3. Evidence */}
             <div className="px-4 pt-3 pb-3 border-b border-gray-100">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Evidence ({evidenceItems.length})</p>
+                <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Evidence ({displayEvidence.length})</p>
                 <div className="flex items-center gap-2 text-xs text-gray-400">
                   <span className="flex items-center gap-0.5"><Check className="w-3 h-3 text-green-500" /> Accept</span>
                   <span className="flex items-center gap-0.5"><X className="w-3 h-3 text-red-400" /> Reject</span>
                 </div>
               </div>
-              {evidenceItems.length === 0 && (
+              {displayEvidence.length === 0 && (
                 <p className="text-xs text-gray-400 italic py-2">No evidence data in uploaded row.</p>
               )}
-              {evidenceItems.map((ev, idx) => {
-                const status   = evidenceStatus[ev.id] ?? null;
+              {displayEvidence.map((ev, idx) => {
+                const status   = evidenceStatus[ev.key] ?? null;
                 const accepted = status === "accepted";
                 const rejected = status === "rejected";
                 return (
-                  <div key={ev.id} id={`ev-${ev.id}`}
+                  <div key={ev.key} id={`ev-${ev.key}`}
                     className={`py-2.5 border-b border-gray-100 last:border-0 rounded-sm transition-colors ${
-                      accepted ? "bg-green-50" : rejected ? "bg-red-50" : activeEv === ev.id ? "bg-blue-50" : ""
+                      accepted ? "bg-green-50" : rejected ? "bg-red-50" : activeEv === ev.key ? "bg-blue-50" : ""
                     }`}>
                     <div className="flex items-start justify-between gap-1 mb-0.5">
-                      <span className="text-xs text-gray-800 font-medium flex-1 leading-snug">{idx + 1}. {ev.type}</span>
+                      <span className="text-xs text-gray-800 font-medium flex-1 leading-snug">
+                        {idx + 1}. {ev.type}{ev.source === "manual" ? " (Manual)" : ""}
+                      </span>
                       <div className="flex items-center gap-1 shrink-0">
                         {ev.strength && <span className={`text-xs font-semibold ${STRENGTH_CLS[ev.strength]}`}>{ev.strength}</span>}
-                        <button onClick={() => toggleEvStatus(ev.id, "accepted")} title="Accept"
+                        <button onClick={() => toggleEvStatus(ev.key, "accepted")} title="Accept"
                           className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${
                             accepted ? "bg-green-500 border-green-500 text-white" : "border-gray-300 text-gray-400 hover:border-green-400 hover:text-green-600"
                           }`}><Check className="w-3 h-3" /></button>
-                        <button onClick={() => toggleEvStatus(ev.id, "rejected")} title="Reject"
+                        <button onClick={() => toggleEvStatus(ev.key, "rejected")} title="Reject"
                           className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${
                             rejected ? "bg-red-400 border-red-400 text-white" : "border-gray-300 text-gray-400 hover:border-red-400 hover:text-red-500"
                           }`}><X className="w-3 h-3" /></button>
@@ -1181,7 +1271,7 @@ export default function ADRDReview() {
                     </div>
                     <p className="text-xs text-gray-500 leading-snug mb-1">{ev.desc}</p>
                     <div className="flex items-center justify-between">
-                      <button onClick={() => jumpToSpan(ev.spanId, ev.id)} className="text-xs text-blue-500 hover:text-blue-700 hover:underline">
+                      <button onClick={() => jumpToSpan(ev.spanId, ev.key)} className="text-xs text-blue-500 hover:text-blue-700 hover:underline">
                         Jump to text
                       </button>
                       {status && (
@@ -1236,7 +1326,7 @@ export default function ADRDReview() {
                       onChange={(e) => setCustomCategory(e.target.value)}
                       className="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
                     >
-                      {LABEL_CATS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      {sectionDefs.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
                     <button onClick={addCustomLabel} disabled={!customText.trim()}
                       className="text-xs px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-40 transition-colors shrink-0">
@@ -1259,9 +1349,16 @@ export default function ADRDReview() {
                     const meta = labelCatMeta(lbl.category);
                     return (
                       <div key={lbl.id} className="group flex items-start gap-2 bg-gray-50 hover:bg-gray-100 rounded-lg px-2.5 py-2 transition-colors">
-                        <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${meta.dot}`} />
+                        <span className="w-2 h-2 rounded-full shrink-0 mt-1" style={{ backgroundColor: meta.dotColor }} />
                         <div className="flex-1 min-w-0">
-                          <span className={`inline-block text-xs px-1.5 py-0.5 rounded border ${meta.pill} mb-0.5`}>
+                          <span
+                            className="inline-block text-xs px-1.5 py-0.5 rounded border mb-0.5"
+                            style={{
+                              backgroundColor: hexToRgba(meta.dotColor, 0.14),
+                              borderColor: hexToRgba(meta.dotColor, 0.35),
+                              color: "#111827",
+                            }}
+                          >
                             {meta.label}
                           </span>
                           <p className="text-xs text-gray-800 leading-snug">"{lbl.text}"</p>
@@ -1346,14 +1443,18 @@ export default function ADRDReview() {
 
           {/* Category buttons */}
           <div className="flex flex-wrap gap-1.5">
-            {LABEL_CATS.map((cat) => (
+            {sectionDefs.map((cat) => (
               <button
                 key={cat.value}
                 onClick={() => applySelectionLabel(cat.value)}
-                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium
-                  transition-all duration-100 active:scale-95 ${cat.pill} ${cat.hover}`}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-all duration-100 active:scale-95"
+                style={{
+                  backgroundColor: hexToRgba(cat.dotColor, 0.12),
+                  borderColor: hexToRgba(cat.dotColor, 0.45),
+                  color: "#111827",
+                }}
               >
-                <span className={`w-2 h-2 rounded-full shrink-0 ${cat.dot}`} />
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.dotColor }} />
                 {cat.label}
               </button>
             ))}
