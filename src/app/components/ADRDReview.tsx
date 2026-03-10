@@ -634,7 +634,7 @@ export default function ADRDReview() {
   // ── hl(): plain render-helper (NOT a React component) ────────
   // Using a plain function avoids the "new component type per render" issue:
   // React sees the returned <span> directly, never unmounts/remounts it.
-  const hl = (id: string, cat: Category, evId: number, text: string): React.ReactNode => {
+  const hl = (id: string, cat: Category, text: string, evId?: number): React.ReactNode => {
     const activeCat = NAV_TO_CAT[activeLeftNav];
     const isVisible = activeLeftNav === "all" || cat === activeCat;
     if (!isVisible) return <span key={id} id={id}>{text}</span>;
@@ -643,8 +643,15 @@ export default function ADRDReview() {
         key={id}
         id={id}
         data-ev-cat={cat}
-        data-ev-id={String(evId)}
-        onClick={() => onSpanClick(id, evId)}
+        data-ev-id={evId != null ? String(evId) : undefined}
+        onClick={() => {
+          if (evId != null) {
+            onSpanClick(id, evId);
+          } else {
+            setActiveSpan(id);
+            setActiveEv(null);
+          }
+        }}
         style={{
           ...CAT_STYLE[cat],
           paddingLeft: "2px",
@@ -664,10 +671,22 @@ export default function ADRDReview() {
   // ── Highlight evidence quotes inside any plain text ───────────
   const renderHighlightedNote = (text: string): React.ReactNode => {
     const activeCat = NAV_TO_CAT[activeLeftNav];
-    const evList    = activeLeftNav === "all"
-      ? evidenceItems
-      : evidenceItems.filter((ev) => ev.cat === activeCat);
-    const matches: { start: number; end: number; ev: EvidenceItem }[] = [];
+
+    const candidates: { spanId: string; quote: string; cat: Category; evId?: number }[] = [
+      ...evidenceItems.map((ev) => ({
+        spanId: ev.spanId,
+        quote: ev.quote,
+        cat: ev.cat,
+        evId: ev.id,
+      })),
+      ...manualLabels.map((lbl) => ({
+        spanId: `ml-span-${lbl.id}`,
+        quote: lbl.text,
+        cat: normalizeCategory(lbl.category),
+      })),
+    ].filter((c) => activeLeftNav === "all" || c.cat === activeCat);
+
+    const matches: { start: number; end: number; item: { spanId: string; quote: string; cat: Category; evId?: number } }[] = [];
 
     const normalizeWithMap = (input: string) => {
       const chars: string[] = [];
@@ -779,13 +798,13 @@ export default function ADRDReview() {
       return null;
     };
 
-    for (const ev of evList) {
-      const span = findPhraseSpan(ev.quote);
+    for (const item of candidates) {
+      const span = findPhraseSpan(item.quote);
       if (!span) continue;
       const start = span.start;
       const end = span.end;
       if (matches.some((x) => start < x.end && end > x.start)) continue;
-      matches.push({ start, end, ev });
+      matches.push({ start, end, item });
     }
 
     matches.sort((a, b) => a.start - b.start);
@@ -794,7 +813,7 @@ export default function ADRDReview() {
     let cursor = 0;
     for (const m of matches) {
       if (m.start > cursor) nodes.push(text.slice(cursor, m.start));
-      nodes.push(hl(m.ev.spanId, m.ev.cat as Category, m.ev.id, text.slice(m.start, m.end)));
+      nodes.push(hl(m.item.spanId, m.item.cat, text.slice(m.start, m.end), m.item.evId));
       cursor = m.end;
     }
     if (cursor < text.length) nodes.push(text.slice(cursor));
